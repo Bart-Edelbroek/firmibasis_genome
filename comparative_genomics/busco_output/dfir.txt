@@ -1,0 +1,19 @@
+# BUSCO version is: 5.3.1 
+# The lineage dataset is:  (Creation date: 2020-09-10, number of genomes: 70, number of BUSCOs: 255)
+# Summarized benchmarking in BUSCO notation for file /crex/proj/snic2020-16-171/firmibasis_comparative_genomics/05_reference_genomes/dfir_genome.fna
+# BUSCO was run in mode: genome
+# Gene predictor used: metaeuk
+
+	***** Results: *****
+
+	C:92.9%[S:92.5%,D:0.4%],F:3.1%,M:4.0%,n:255	   
+	237	Complete BUSCOs (C)			   
+	236	Complete and single-copy BUSCOs (S)	   
+	1	Complete and duplicated BUSCOs (D)	   
+	8	Fragmented BUSCOs (F)			   
+	10	Missing BUSCOs (M)			   
+	255	Total BUSCO groups searched		   
+
+Dependencies and versions:
+	hmmsearch: 3.2
+	metaeuk: a0f584d0f2ee96ab8fd7e6e6367761051d5ef4a5

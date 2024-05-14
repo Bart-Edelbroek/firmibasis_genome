@@ -1,0 +1,15 @@
+Status	star_map_ddis/Ddis-0h-A.bam	star_map_ddis/Ddis-0h-B.bam	star_map_ddis/Ddis-0h-C.bam	star_map_ddis/Ddis-16h-A.bam	star_map_ddis/Ddis-16h-B.bam	star_map_ddis/Ddis-16h-C.bam	star_map_ddis/Ddis-24h-A.bam	star_map_ddis/Ddis-24h-B.bam	star_map_ddis/Ddis-24h-C.bam
+Assigned	35619428	56269288	54705730	60183027	39099638	55823912	42635288	47793589	45151520
+Unassigned_Unmapped	0	0	0	0	0	0	0	0	0
+Unassigned_Read_Type	0	0	0	0	0	0	0	0	0
+Unassigned_Singleton	0	0	0	0	0	0	0	0	0
+Unassigned_MappingQuality	0	0	0	0	0	0	0	0	0
+Unassigned_Chimera	0	0	0	0	0	0	0	0	0
+Unassigned_FragmentLength	0	0	0	0	0	0	0	0	0
+Unassigned_Duplicate	0	0	0	0	0	0	0	0	0
+Unassigned_MultiMapping	0	0	0	0	0	0	0	0	0
+Unassigned_Secondary	0	0	0	0	0	0	0	0	0
+Unassigned_NonSplit	0	0	0	0	0	0	0	0	0
+Unassigned_NoFeatures	675898	866354	808639	1258149	950263	1442044	1122885	1472986	1303414
+Unassigned_Overlapping_Length	0	0	0	0	0	0	0	0	0
+Unassigned_Ambiguity	26418	40947	38283	93525	36841	70398	38381	49229	37986

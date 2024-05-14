@@ -1,0 +1,640 @@
+---
+title: "Analysis of annotated <i>D. firmibasis</i> JAVFKY000000000 assembly"
+author: "Bart Edelbroek"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+# Load packages and define functions
+```{r setup, message=FALSE, warning=FALSE}
+library(circlize)
+library(RColorBrewer)
+library(tidyverse)
+library(ggplot2)
+library(karyoploteR)
+
+scale_rows = function(x){
+	m = apply(x, 1, mean, na.rm = T)
+	s = apply(x, 1, sd, na.rm = T)
+	return((x - m) / s)
+}
+
+interpolate = function(input_data, interpol=10){
+  rslice <- input_data[1,]
+  save_mean <- data.frame(input_data[1,-(1:3)])
+  reduced_data <- data.frame()
+  for (i in 2:nrow(input_data)) {
+    if (input_data[i,1]==rslice[1] & nrow(save_mean) < interpol) {
+      rslice[3] <- input_data[i,3]
+      save_mean <- rbind(save_mean, input_data[i,-(1:3)])
+    } else  {
+      rslice[-(1:3)] <- colMeans(save_mean)
+      reduced_data <- rbind(reduced_data, rslice)
+      rslice <- input_data[i,]
+      save_mean <- data.frame(input_data[1,-(1:3)])
+    }
+  }
+	rslice[-(1:3)] <- colMeans(save_mean)
+  reduced_data <- rbind(reduced_data, rslice)
+  return(reduced_data)
+}
+
+theme_set(theme_bw())
+theme_update(text = element_text(size = 8))
+```
+
+# Visualization of the D. firmibasis assembly and read coverage.
+mRNA and gDNA read mapping data was analyzed in 2500bp intervals and counted, with regions and counts located in the *count_regions* folder. Genome data such as gene locations generated with scripts in *genomes* folder. 
+
+```{r Genome analysis, message=FALSE, warning=FALSE, fig.width=8, fig.height=8}
+options(scipen = 999)
+
+#Read in data and reformat
+
+dfir_index <- read.table("genomes/dfir_genome.fa.fai", sep = "\t")
+firmibasis <- data.frame(name = dfir_index[,1],
+                         start = rep(0,nrow(dfir_index)),
+                         end = dfir_index[,2])
+firmibasis$name <- factor(firmibasis$name, levels = firmibasis$name)
+firmibasis$alias <- c(paste0("Dfir_chr",1:6),"","","Dfir_mtDNA",rep("",3))
+
+ddis_index <- read.table("genomes/ddis_genome.fasta.fai", sep = "\t")[c(5:11,1:4),]
+discoideum <- data.frame(name = ddis_index[,1],
+                         start = rep(0,nrow(ddis_index)),
+                         end = ddis_index[,2])
+discoideum$name <- factor(discoideum$name, levels = discoideum$name)
+
+dfir_regions <- read.table("count_regions/regions_mRNA_dfir.txt", sep = "\t", header = T)
+dfir_sum_regions <- cbind(dfir_regions[,2:4],mRNA = rowSums(dfir_regions[,-(1:6)]))
+dfir_gene_locations <- read.table("genomes/dfir_genes_location.txt", sep = " ")
+
+
+dfir_illumina_gDNA <- read.table("count_regions/regions_gDNA_illumina.txt", sep = "\t", header = T)
+dfir_nanopore_gDNA <- read.table("count_regions/regions_gDNA_nanopore.txt", sep = "\t", header = T)
+dfir_sRNA <- read.table("count_regions/regions_sRNA.txt", sep = "\t", header = T)
+
+
+dfir_coverage <- cbind.data.frame(dfir_sum_regions[1:3], gDNA_onp = dfir_nanopore_gDNA[,7], gDNA_ill = dfir_illumina_gDNA[,7],  mRNA = dfir_sum_regions[,4], sRNA =   dfir_sRNA[,7] )
+dfir_coverage[,5:6] <- dfir_coverage[,5:6]*151/2500
+
+read_lengths <- read.table("count_regions/read_length.txt", sep = ",", header = F)
+read_lengths <- uncount(read_lengths, V1)
+dfir_coverage$gDNA_onp <- dfir_coverage$gDNA_onp*mean(read_lengths$V2)/2500
+dfir_coverage$sRNA <- dfir_coverage$sRNA
+
+ddis_regions <- read.table("count_regions/regions_mRNA_ddis.txt", sep = "\t", header = T)
+ddis_sum_regions <- cbind(ddis_regions[,2:4],mRNA = rowSums(ddis_regions[,-(1:6)]))
+combined_sum_regions <- rbind(dfir_sum_regions,ddis_sum_regions)
+
+dfir_TE <- read.table("transposable_elements/out.txt", sep = "\t", header = F)
+dfir_TE <- dfir_TE[with(dfir_TE, order(V1,V4,V2)),]
+colnames(dfir_TE) <- c("chr","start","end","TE_ID","length","eval","bitscore")
+dfir_TE$min <- apply(dfir_TE[,2:3],1,min)
+dfir_TE$max <- apply(dfir_TE[,2:3],1,max)
+dfir_dirs_TE<- dfir_TE[dfir_TE$TE_ID=="DIRS1",]
+
+rRNAs <- read.table("genomes/dfir_rRNA_location.txt",sep = " ")
+
+dfir_telomeres <- read.table("genomes/dfir_telomere_locations.txt",sep = " ")
+dfir_telomeres[,4] <- 1
+dfir_telomeres_not_ext <- dfir_telomeres
+dfir_telomeres$V3[dfir_telomeres$V3 < 1e5] <- dfir_telomeres$V3[dfir_telomeres$V3 < 1e5] + 1e5
+dfir_telomeres$V2[dfir_telomeres$V2 > 1e6] <- dfir_telomeres$V2[dfir_telomeres$V2 > 1e6] - 1e5
+dfir_telomeres_not_ext$V3[dfir_telomeres_not_ext$V3 < 1e4] <- dfir_telomeres_not_ext$V3[dfir_telomeres_not_ext$V3 < 1e4] + 2e3
+dfir_telomeres_not_ext$V2[dfir_telomeres_not_ext$V2 > 1e5] <- dfir_telomeres_not_ext$V2[dfir_telomeres_not_ext$V2 > 1e5] - 2e3
+
+#Merge Transposable elements within close proximity
+
+overlap <- 50000
+rslice <- dfir_dirs_TE[1,]
+dfir_dirs_TE_stitched <- data.frame()
+for (i in 1:nrow(dfir_dirs_TE)-1) {
+  if (all(rslice[c(1,4)]==dfir_dirs_TE[i+1,c(1,4)],
+          rslice[9]+overlap>dfir_dirs_TE[i+1,8])) 
+    {
+      rslice[9] <- max(as.numeric(rslice[9]),dfir_dirs_TE[i+1,9]) #add the data from the next hit
+      rslice[8] <- min(as.numeric(rslice[8]),dfir_dirs_TE[i+1,8])
+    } else { #the next hit is not within range
+      dfir_dirs_TE_stitched <- rbind(dfir_dirs_TE_stitched,rslice)
+      rslice <- dfir_dirs_TE[i+1,]
+  }
+}
+dfir_dirs_TE_stitched <- rbind(dfir_dirs_TE_stitched,rslice) #add final row
+dfir_dirs_TE_stitched <- cbind(dfir_dirs_TE_stitched[c(1,8,9)],1,dfir_dirs_TE_stitched[4])
+
+
+#Interpolate read mapping regions
+
+reduced_dfir_coverage <- interpolate(dfir_coverage, interpol = 20)
+reduced_8_dfir_coverage <- interpolate(dfir_coverage, interpol = 8)
+
+dfir_coverage[,4:7] <- log10(1+dfir_coverage[,4:7])
+reduced_dfir_coverage[,4:7] <- log10(1+reduced_dfir_coverage[,4:7])
+
+
+#Prepare and plot D. firmibasis assembly
+
+firmibasis_main <- firmibasis[1:6,]
+firmibasis_main$name <- factor(firmibasis_main$name, levels = firmibasis_main$name)
+firmibasis_extra <- firmibasis[7:12,]
+firmibasis_extra$name <- factor(firmibasis_extra$name, levels = firmibasis_extra$name)
+
+
+dfir_gene_locations_plot <- cbind(dfir_gene_locations[1:3],1)
+bed_list <- list(dfir_dirs_TE_stitched, dfir_telomeres )
+
+genDens <- genomicDensity(dfir_gene_locations, window.size = 1e5)
+genDens <- genDens[genDens$chr %in% firmibasis_main$name,]
+mean(genDens$value)
+
+#svglite::svglite("plots/dfir_main_circos.svg",width = 6.7, height = 6.7)
+
+
+ylims <- cbind(cbind(c(2,1,6)*-1,c(2,1,6))+round(apply(reduced_dfir_coverage[,4:6], 2, median)),round(apply(reduced_dfir_coverage[,4:6], 2, median)))
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = append(rep(1, nrow(firmibasis_main)-1),30))
+circos.genomicInitialize(firmibasis_main[,1:3], 
+                         sector.names = c(paste0("chr",1:6)))
+circos.track(ylim = c(0, 1), 
+             bg.col = c(brewer.pal(7,"Dark2"),rep("white",7)), 
+             track.height = 0.05)
+circos.genomicTrack(reduced_dfir_coverage[,-7], 
+										ylim = c(0.5,4), 
+										panel.fun = function(region, value, ...) {
+  circos.genomicLines(region, value, col = brewer.pal(4,"Set1")[-3], lwd = 1, ...)
+	circos.lines(CELL_META$cell.xlim, c(1,1), lty = 2, col = "#00000080")
+	circos.lines(CELL_META$cell.xlim, c(2,2), lty = 2, col = "#00000080")
+	circos.lines(CELL_META$cell.xlim, c(3,3), lty = 2, col = "#00000080")
+},track.height = 0.2)
+circos.genomicTrack(genDens, ylim = c(0,1), track.height = 0.1,
+                    panel.fun = function(region, value, ...) {
+  circos.genomicLines(region, value, col = "grey", area = TRUE, border = F, ...)
+	#circos.lines(CELL_META$cell.xlim, c(mean(genDens$value),mean(genDens$value)), lty = 2, col = "black")
+                    })
+circos.genomicTrack(bed_list, ylim = c(0,1),
+										panel.fun = function(region, value, ...) {
+										  i = getI(...)
+										  circos.genomicRect(region,value, border = NA,  col = c("black","#E41A1C")[i], ...)
+},track.height = 0.1)
+
+#dev.off()
+
+
+```
+
+# Mapping of mRNA and small RNA on DIRS-1 region on chr1.
+sRNA mapping data was analyzed as for the mRNA and gDNA, and mapping is visualised on the DIRS-1 region
+```{r DIRS-1 analysis, message=FALSE, warning=FALSE, fig.height=2, fig.width=4}
+
+dfir_gene_locations_dirs <- dfir_gene_locations[dfir_gene_locations[,1]=="contig_31_np1212"&dfir_gene_locations[,2]>4300000&dfir_gene_locations[,3]<5000000,]
+
+dirs_chr1 <- toGRanges(data.frame(chr="contig_31_np1212", start=4300000, end=5000000))
+dirs1_annot_chr1 <- toGRanges(data.frame(dfir_dirs_TE_stitched[dfir_dirs_TE_stitched$TE_ID=="DIRS1",1:3],gieStain="gpos100"))
+
+#svglite::svglite("plots/dirs1_sRNA_expression.svg",width = 6, height = 2)
+pp <- getDefaultPlotParams(plot.type=1)
+pp$leftmargin <- 0.2
+pp$rightmargin <- 0.2
+kp <- plotKaryotype(genome = dirs_chr1, cytobands = dirs1_annot_chr1, labels.plotter = NULL, plot.params = pp)
+kpAddBaseNumbers(kp, tick.dist = 100000, tick.len = 10, tick.col="black", cex=0.8,
+                 minor.tick.dist = 50000, minor.tick.len = 10, minor.tick.col = "black")
+kpLines(kp, toGRanges(data.frame(reduced_8_dfir_coverage[216:250,1:3], y=log10(reduced_8_dfir_coverage$mRNA[216:250]))), ymin = 1, ymax = 3,col="#984EA3")
+kpLines(kp, toGRanges(data.frame(reduced_8_dfir_coverage[216:250,1:3], y=log10(reduced_8_dfir_coverage$sRNA[216:250]*8))), ymin = 2, ymax = 4)
+#kpRect(kp, chr=dfir_gene_locations_dirs[,1], x0 = dfir_gene_locations_dirs[,2], x1 = dfir_gene_locations_dirs[,3], y0 = 0, y1 = 1, data.panel = "ideogram", border = NA, col = "grey")
+kpAxis(kp, side = 1, tick.pos = c(0,0.5,1), labels = c("10x","100x","1000x"), cex = 0.8, col = "#984EA3")
+kpAxis(kp, side = 2, numticks = 3, tick.pos = c(0,0.5,1), labels = c(100,1000,10000), cex = 0.8, col = "black")
+#dev.off()
+
+
+```
+
+# Mean coverage of different data types
+```{r}
+round(colMeans(10^dfir_coverage[,4:7]-1))
+```
+
+# Synteny analysis of new and old D. firimbasis assembly
+Synteny calculated with Satsuma2 between the GenBank GCA_000277485.1 assembly and GenBank JAVFKY000000000 assembly. Homologous regions are plotted. 
+```{r Compare to old assembly, message=FALSE, warning=FALSE, fig.width=3.4, fig.height=3.4}
+dfir_old_sats_in <- read.table("comparative_genomics/dfir_vs_old.out", sep = "\t", header = F)
+dfir_old_sats_in <- dfir_old_sats_in[with(dfir_old_sats_in, order(V1,V2)),]
+
+
+# Merge regions which are in close proximity in both genomes
+
+overlap <- 5000
+rslice <- as.character(dfir_old_sats_in[1,])
+dfir_old_sats <- data.frame()
+for (i in 1:nrow(dfir_old_sats_in)-1) {
+  if (all(rslice[c(1,4,8)]==dfir_old_sats_in[i+1,c(1,4,8)])) {
+    if (all(rslice[8]=="-", #the next hit is also reverse and within range
+        as.numeric(rslice[5])-overlap<dfir_old_sats_in[i+1,6],
+        as.numeric(rslice[3])+overlap>dfir_old_sats_in[i+1,2])) {
+      rslice[3] <- max(as.numeric(rslice[3]),dfir_old_sats_in[i+1,3]) #add the data from the next hit
+      rslice[5] <- min(as.numeric(rslice[5]),dfir_old_sats_in[i+1,5])
+    } else if (all(rslice[8]=="+", #the next hit is also in the same direction and within range
+                   as.numeric(rslice[6])+overlap>dfir_old_sats_in[i+1,5],
+                   as.numeric(rslice[3])+overlap>dfir_old_sats_in[i+1,2])) {
+      rslice[3] <- max(as.numeric(rslice[3]),dfir_old_sats_in[i+1,3]) #add the data from the next hit
+      rslice[6] <- max(as.numeric(rslice[6]),dfir_old_sats_in[i+1,6])
+    } else { #the next hit is not within range
+      dfir_old_sats <- rbind(dfir_old_sats,rslice)
+      rslice <- as.character(dfir_old_sats_in[i+1,])
+    }
+    
+  } else { #the next hit is different (chromosome, direction)
+    dfir_old_sats <- rbind(dfir_old_sats,rslice)
+    rslice <- as.character(dfir_old_sats_in[i+1,])
+  }
+}
+
+dfir_old_sats <- rbind(dfir_old_sats,rslice) #add final row
+
+dfir_old_sats[,4] <- sapply(strsplit(dfir_old_sats[,4],"_"), `[`, 1)
+
+dfir_old_index <- read.table("genomes/dfir_old_genome.fa.fai", sep = "\t")
+firmibasis_old <- data.frame(name = dfir_old_index[,1],
+                         start = rep(0,nrow(dfir_old_index)),
+												 end = dfir_old_index[,2])
+firmibasis_old$name <- factor(firmibasis_old$name, levels = firmibasis_old$name)
+
+dfir_old_sats[,2] <- as.numeric(dfir_old_sats[,2])
+dfir_old_sats[,3] <- as.numeric(dfir_old_sats[,3])
+dfir_old_sats[,5] <- as.numeric(dfir_old_sats[,5])
+dfir_old_sats[,6] <- as.numeric(dfir_old_sats[,6])
+
+
+adj_df <- dfir_old_sats
+firmibasis$add <- c(0,cumsum(firmibasis$end)[-length(firmibasis$end)])
+adj_df[,c(2,3)] <- adj_df[,c(2,3)]+firmibasis$add[match(adj_df[,1],firmibasis$name)]
+
+firmibasis_old$add <- c(0,cumsum(firmibasis_old$end)[-length(firmibasis_old$end)])
+adj_df[,c(5,6)] <- adj_df[,c(5,6)]+firmibasis_old$add[match(adj_df[,4],firmibasis_old$name)]
+
+
+#Calculate 2D homology in 10000bp intervals
+
+precision <- 10000
+correlation_df <- data.frame()
+i <- 1
+for (i in 1:nrow(adj_df)) {
+  seq_length <- (adj_df[i,3]-adj_df[i,2])/precision
+  x <- seq(adj_df[i,2],adj_df[i,3],length.out = seq_length)
+    if (adj_df[i,8]=="-") {
+      y <- seq(adj_df[i,6],adj_df[i,5],length.out = seq_length)
+    } else if (adj_df[i,8]=="+") {
+      y <- seq(adj_df[i,5],adj_df[i,6],length.out = seq_length)
+    }
+  name <- rep(adj_df[i,1],length(x))
+  correlation_df <- rbind(correlation_df, cbind(x,y,name))
+}
+correlation_df$x <- as.numeric(correlation_df$x)
+correlation_df$y <- as.numeric(correlation_df$y)
+correlation_df$name <- firmibasis$alias[match(correlation_df$name,firmibasis$name)]
+
+ggplot(data = correlation_df, mapping = aes(y=x,x=y, col = name))+
+  geom_point(shape = ".")+
+  geom_rug(alpha = 1, lwd = 0.1)+xlab("D. firmibasis ASM27748v1 assembly (997 contigs)")+ylab("D. firmibasis new assembly")+
+  geom_hline(yintercept = firmibasis$add)+
+  scale_color_manual(values = c("black",brewer.pal(7,"Dark2")))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), legend.position = "none") -> a
+a
+#ggsave("plots/dfir_old.png",a,"png", width = 3.8,height = 3.8, dpi = 1200)
+
+```
+
+# Synteny analysis of D. discoideum and new D. firimbasis assembly
+As above, but synteny calculated between the dictybase D. discoideum assembly and GenBank JAVFKY000000000 assembly.
+```{r Compare to discoideum assembly, message=FALSE, warning=FALSE, fig.width=3.4,fig.height=3.4}
+dfir_sats_in <- read.table("comparative_genomics/ddis_vs_dfir.out", sep = "\t", header = F)
+dfir_sats_in <- dfir_sats_in[with(dfir_sats_in, order(V1,V2)),]
+
+# Merge regions which are in close proximity in both genomes
+
+overlap <- 5000
+rslice <- as.character(dfir_sats_in[1,])
+dfir_sats <- data.frame()
+for (i in 1:nrow(dfir_sats_in)-1) {
+  if (all(rslice[c(1,4,8)]==dfir_sats_in[i+1,c(1,4,8)])) {
+    if (all(rslice[8]=="-", #the next hit is also reverse and within range
+        as.numeric(rslice[5])-overlap<dfir_sats_in[i+1,6],
+        as.numeric(rslice[3])+overlap>dfir_sats_in[i+1,2])) {
+      rslice[3] <- max(as.numeric(rslice[3]),dfir_sats_in[i+1,3]) #add the data from the next hit
+      rslice[5] <- min(as.numeric(rslice[5]),dfir_sats_in[i+1,5])
+    } else if (all(rslice[8]=="+", #the next hit is also in the same direction and within range
+                   as.numeric(rslice[6])+overlap>dfir_sats_in[i+1,5],
+                   as.numeric(rslice[3])+overlap>dfir_sats_in[i+1,2])) {
+      rslice[3] <- max(as.numeric(rslice[3]),dfir_sats_in[i+1,3]) #add the data from the next hit
+      rslice[6] <- max(as.numeric(rslice[6]),dfir_sats_in[i+1,6])
+    } else { #the next hit is not within range
+      dfir_sats <- rbind(dfir_sats,rslice)
+      rslice <- as.character(dfir_sats_in[i+1,])
+    }
+    
+  } else { #the next hit is different (chromosome, direction)
+    dfir_sats <- rbind(dfir_sats,rslice)
+    rslice <- as.character(dfir_sats_in[i+1,])
+  }
+}
+dfir_sats <- rbind(dfir_sats,rslice) #add final row
+
+dfir_sats[,1] <-substr(dfir_sats[,1],1,10)
+
+dfir_sats[,2] <- as.numeric(dfir_sats[,2])
+dfir_sats[,3] <- as.numeric(dfir_sats[,3])
+dfir_sats[,5] <- as.numeric(dfir_sats[,5])
+dfir_sats[,6] <- as.numeric(dfir_sats[,6])
+
+adj_df <- dfir_sats
+firmibasis$add <- c(0,cumsum(firmibasis$end)[-length(firmibasis$end)])
+adj_df[,c(5,6)] <- adj_df[,c(5,6)]+firmibasis$add[match(adj_df[,4],firmibasis$name)]
+
+
+#Reorder D. discoideum chromosomes for plotting
+
+discoideum$flip <- 0
+discoideum$flip[c(1,4,6)] <- discoideum$end[c(1,4,6)]
+adj_df[,c(2,3)] <- abs(adj_df[,c(2,3)]-discoideum$flip[match(adj_df[,1],discoideum$name)])
+
+rearrange <- c(6,3,4,5,2,1,7:nrow(discoideum))
+discoideum_rearranged <- discoideum[rearrange,]
+discoideum_rearranged$add <- c(0,cumsum(discoideum_rearranged$end)[-length(discoideum_rearranged$end)])
+adj_df[,c(2,3)] <- adj_df[,c(2,3)]+discoideum_rearranged$add[match(adj_df[,1],discoideum_rearranged$name)]
+
+
+#Calculate 2D homology in 10000bp intervals
+
+precision <- 1000
+correlation_df <- data.frame()
+i <- 1
+for (i in 1:nrow(adj_df)) {
+  seq_length <- (abs(adj_df[i,3]-adj_df[i,2]))/precision
+  x <- seq(adj_df[i,2],adj_df[i,3],length.out = seq_length)
+    if (adj_df[i,8]=="-") {
+      y <- seq(adj_df[i,6],adj_df[i,5],length.out = seq_length)
+    } else if (adj_df[i,8]=="+") {
+      y <- seq(adj_df[i,5],adj_df[i,6],length.out = seq_length)
+    }
+  name <- rep(adj_df[i,4],length(x))
+  correlation_df <- rbind(correlation_df, cbind(x,y,name))
+}
+correlation_df$x <- as.numeric(correlation_df$x)
+correlation_df$y <- as.numeric(correlation_df$y)
+correlation_df$name <- firmibasis$alias[match(correlation_df$name,firmibasis$name)]
+correlation_df$name <- factor(correlation_df$name, levels = unique(firmibasis$alias))
+
+
+ggplot(data = correlation_df, mapping = aes(x,y, col = name))+
+  geom_point(shape = ".")+
+  geom_rug(alpha = 1, lwd = 0.1)+xlab("D. discoideum")+ylab("D. firmibasis")+
+  geom_vline(xintercept = discoideum_rearranged$add)+
+  geom_hline(yintercept = firmibasis$add)+
+  scale_color_brewer(palette = "Dark2")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), legend.position = "none")->a
+a
+#ggsave("plots/dfir_ddis.png",a,"png", width = 2.4,height = 2.4, dpi = 1200)
+
+```
+
+# Detailed commparison between D. discoideum and D. firmibasis.
+ncRNA locations generated and located in *genomes* folder.
+```{r Comparison with discoideum in detail, message=FALSE, warning=FALSE, fig.width=8, fig.height=8}
+
+links_df <- dfir_sats
+
+fir_use_contigs <- c("contig_31_np1212","contig_57_np1212","contig_25_np1212",
+                     "contig_29_np1212","contig_24_np1212","contig_32_np1212")
+dis_use_contigs <- c("DDB0232428","DDB0232429","DDB0232430",
+                     "DDB0232431","DDB0232432","DDB0232433")
+combined <- rbind(firmibasis[firmibasis$name%in%fir_use_contigs,1:3],
+                  discoideum[discoideum$name%in%dis_use_contigs,1:3])
+combined$name <- factor(combined$name, levels = c(fir_use_contigs,dis_use_contigs))
+links_df <- links_df[links_df[,1]%in%combined$name&links_df[,4]%in%combined$name,]
+
+
+dfir_tRNAs <- read.table("genomes/dfir_tRNAs_location.txt",sep = " ")
+ddis_tRNAs <- read.table("genomes/ddis_tRNAs_location.txt",sep = " ")
+tRNA_comb <- rbind.data.frame(dfir_tRNAs,ddis_tRNAs)
+tRNA_lines <- data.frame(chr = tRNA_comb$V1, start = tRNA_comb$V2, end = tRNA_comb$V3, value1 = 1.5, type = factor(tRNA_comb$V4))
+bed_list <- list()
+for (i in unique(tRNA_lines$type)) {
+  bed_list  <- append(bed_list, list(tRNA_lines[tRNA_lines$type==i,1:4]))
+}
+
+classI <- read.table("genomes/curated_classI.bed",sep = "\t")
+classI$V5 <- "classI"
+miRNAs <- read.table("genomes/combined_miRNA_annotations.bed",sep = "\t")
+miRNAs <- miRNAs[miRNAs$V8=="miRNA_primary_transcript",c(1:3,10,5,6)]
+colnames(miRNAs) <- paste0("V",1:6)
+miRNAs$V5 <- "miRNA"
+miRNAs$V4 <- substr(miRNAs$V4, 6,30)
+sRNAs <- rbind(classI,miRNAs)
+
+dfir_sRNA_links <- data.frame()
+for (i in 1:nrow(sRNAs)) {
+  test <- c(which(links_df[,5]<sRNAs[i,2]&links_df[,6]>sRNAs[i,3]&sRNAs[i,1]==links_df[,4]))
+  if (length(test) > 0) {
+    dfir_sRNA_links <- rbind(dfir_sRNA_links,
+                           data.frame(links_df[test,],"type" = sRNAs[i,5], "name" = sRNAs[i,4]))
+  }
+}
+ddis_sRNA_links <- data.frame()
+for (i in 1:nrow(sRNAs)) {
+  test <- c(which(links_df[,2]<sRNAs[i,2]&links_df[,3]>sRNAs[i,3]&sRNAs[i,1]==links_df[,1]))
+  if (length(test) > 0) {
+    ddis_sRNA_links <- rbind(ddis_sRNA_links,
+                           data.frame(links_df[test,],"type" = sRNAs[i,5], "name" = sRNAs[i,4]))
+  }
+}
+sRNA_links <- dplyr::intersect(dfir_sRNA_links[,-10],ddis_sRNA_links[,-10])
+
+bed_list <- list(data.frame(sRNAs[sRNAs$V5=="classI",1:3],value=1),
+                 data.frame(sRNAs[sRNAs$V5=="miRNA",1:3],value=1))
+
+#svglite::svglite("plots/discoideum_firmibasis_circos.svg",width = 6.7, height = 6.7)
+circos.clear()
+circos.par(start.degree = 80, gap.degree = append(rep(1, nrow(combined)-1),20))
+circos.genomicInitialize(combined,
+                         sector.names = c(paste0("Dfi-chr",1:6),
+                                          paste0("Ddi-chr",1:6)))
+circos.track(ylim = c(0, 1), 
+             bg.col = c(brewer.pal(6,"Dark2"),rep("white",6)), 
+             track.height = 0.05)
+#circos.genomicDensity(tRNA_comb,col = c("#40404040"),track.height = 0.10, border = "#40404080", window.size = 30000)
+#circos.genomicRainfall(tRNA_comb,col = c("black"),track.height = 0.10, pch = 16, cex = 0.3)
+circos.genomicTrack(tRNA_lines, stack = TRUE, track.height = 0.10,
+    panel.fun = function(region, value, ...) {
+        circos.genomicLines(region, value, type = "h", baseline = "bottom")
+})
+circos.genomicTrack(bed_list, stack = TRUE, track.height = 0.05,
+    panel.fun = function(region, value, ...) {
+        i = getI(...)
+        circos.genomicPoints(region, value, pch = 16, cex = 0.5, col = i, ...)
+})
+for (i in 1:7) {
+  circos.genomicLink(links_df[links_df[,4]==combined$name[i],1:3],
+                     links_df[links_df[,4]==combined$name[i],4:6],
+                     col = paste0(brewer.pal(7, "Dark2")[i],"40"))
+}
+for (i in 1:7) {
+  circos.genomicLink(sRNA_links[sRNA_links[,4]==combined$name[i],1:3],
+                     sRNA_links[sRNA_links[,4]==combined$name[i],4:6],
+                     col = paste0(brewer.pal(7, "Dark2")[i],"40"), border = "black")
+}
+#dev.off()
+
+circos.clear()
+
+```
+
+# Compare mtDNA
+```{r Compare mtDNA, message=FALSE, warning=FALSE, fig.width= 2, fig.height=2}
+
+use_contigs <- c("contig_65_np1212","DDB0169550")
+combined <- rbind(firmibasis[firmibasis$name%in%use_contigs,1:3],
+                  discoideum[discoideum$name%in%use_contigs,1:3])
+combined$name <- factor(combined$name, levels = c(use_contigs))
+
+mtDNA_sats_in <- dfir_sats_in
+mtDNA_sats_in$V1 <- substr(mtDNA_sats_in$V1, 1, 10)
+mtDNA_sats_in <- mtDNA_sats_in[mtDNA_sats_in[,1]%in%combined$name&mtDNA_sats_in[,4]%in%combined$name,]
+
+overlap <- 500
+rslice <- mtDNA_sats_in[1,]
+mtDNA_sats <- data.frame()
+for (i in 2:nrow(mtDNA_sats_in)) {
+  if (all(rslice[c(1,4)]==mtDNA_sats_in[i,c(1,4)],
+          abs(rslice[3]-mtDNA_sats_in[i,2])<overlap,
+          abs(rslice[6]-mtDNA_sats_in[i,5])<overlap)) 
+    {
+      rslice[3] <- max(as.numeric(rslice[3]),mtDNA_sats_in[i,3]) #add the data from the next hit
+      rslice[6] <- max(as.numeric(rslice[6]),mtDNA_sats_in[i,6])
+    } else { #the next hit is not within range
+      mtDNA_sats <- rbind(mtDNA_sats,rslice)
+      rslice <- mtDNA_sats_in[i,]
+  }
+}
+mtDNA_sats <- rbind(mtDNA_sats,rslice) #add final row
+
+
+
+
+#svglite::svglite("plots/discoideum_firmibasis_mtDNA_circos.svg",width = 2.5, height = 2.5)
+circos.clear()
+circos.par(start.degree = 90)
+circos.genomicInitialize(combined, major.by = 10000, axis.labels.cex = 0.6,
+                         sector.names = c("Dfi-mtDNA","Ddi-mtDNA"))
+circos.track(ylim = c(0, 1), 
+             bg.col = c("#377EB8", "white"),
+             bg.border = "#000000", bg.lwd = 2, track.height = 0.1)
+circos.genomicLink(mtDNA_sats[,1:3],
+                   mtDNA_sats[,4:6],
+                   col = "#377EB860")
+
+#dev.off()
+
+circos.clear()
+
+
+```
+
+# Comparison of the D. discoideum extrachromosomal DNA, with homologous contigs in D. firmibasis assembly JAVFKY000000000
+```{r Compare exDNA, message=FALSE, warning=FALSE, fig.width=2, fig.height=2}
+
+
+use_contigs <- c("contig_9_np1212","contig_16_np1212","DDB0237465")
+combined <- rbind(firmibasis[firmibasis$name%in%use_contigs,1:3],
+                  discoideum[discoideum$name%in%use_contigs,1:3])
+combined$name <- factor(combined$name, levels = c(use_contigs))
+
+rDNA_sats_in <- dfir_sats_in
+rDNA_sats_in$V1 <- substr(rDNA_sats_in$V1, 1, 10)
+rDNA_sats_in <- rDNA_sats_in[rDNA_sats_in[,1]%in%combined$name&rDNA_sats_in[,4]%in%combined$name,]
+
+overlap <- 5000
+rslice <- rDNA_sats_in[1,]
+rDNA_sats <- data.frame()
+for (i in 2:nrow(rDNA_sats_in)) {
+  if (all(rslice[c(1,4,8)]==rDNA_sats_in[i,c(1,4,8)],
+          abs(rslice[3]-rDNA_sats_in[i,2])<overlap,
+          abs(rslice[6]-rDNA_sats_in[i,5])<overlap)) 
+    {
+      rslice[3] <- max(as.numeric(rslice[3]),rDNA_sats_in[i,3]) #add the data from the next hit
+      rslice[6] <- max(as.numeric(rslice[6]),rDNA_sats_in[i,6])
+      rslice[2] <- min(as.numeric(rslice[2]),rDNA_sats_in[i,2]) #add the data from the next hit
+      rslice[5] <- min(as.numeric(rslice[5]),rDNA_sats_in[i,5])
+    } else { #the next hit is not within range
+      rDNA_sats <- rbind(rDNA_sats,rslice)
+      rslice <- rDNA_sats_in[i,]
+  }
+}
+rDNA_sats <- rbind(rDNA_sats,rslice) #add final row
+
+
+rRNAs_plot <- list(data.frame(rRNAs[,1:3],"value" = 1))
+
+#svglite::svglite("plots/discoideum_firmibasis_rDNA_circos.svg",width = 2.5, height = 2.5)
+circos.clear()
+circos.par(start.degree = 70, gap.degree = c(0,0,40))
+circos.genomicInitialize(combined, major.by = 10000, axis.labels.cex = 0.6,
+                         sector.names = c("Dfi-contig_9","Dfi-contig_16","Ddi-rDNA"))
+circos.track(ylim = c(0, 1), 
+             bg.col = c("#E41A1C","#E41A1C", "white"),
+             bg.border = "#000000", bg.lwd = 2, track.height = 0.1)
+circos.genomicTrack(rRNAs_plot, ylim = c(0,1),
+										panel.fun = function(region, value, ...) {
+										  i = getI(...)
+										  circos.genomicRect(region,value, border = NA, col = "black", ...)
+},track.height = 0.1)
+circos.genomicLink(rDNA_sats[,1:3],
+                   rDNA_sats[,4:6],
+                   col = "#E41A1C60")
+
+#dev.off()
+
+circos.clear()
+
+
+```
+
+# Differential gene expression analysis in D. firmibasis and D. discoideum multicellular development
+Gene counts are located in *transcriptomics* folder. Differentially expressed genes identified by Likelihood Ratio Test with DESeq2
+```{r DGEanalysis firmibasis discoideumm, message=FALSE, warning=FALSE, width = 3.4, height = 3.4}
+#read data
+pval <- 0.001
+
+#Mean mapping percentage D. firmibasis
+mean(94.66,94.78,90.59,93.01,94.72,92.79,92.95,94.79,93.37)
+dfir_fc_summary <- read.table("transcriptomics/counts_dfir.txt.summary", header = T,row.names = 1)
+rowMeans(dfir_fc_summary["Assigned",]/colSums(dfir_fc_summary))
+
+#Mean mapping percentage D. discoideum
+mean(87.86,89.96,89.39,89.99,93.08,91.41,86.99,90.96,87.91)
+ddis_fc_summary <- read.table("transcriptomics/counts_ddis.txt.summary", header = T,row.names = 1)
+rowMeans(ddis_fc_summary["Assigned",]/colSums(ddis_fc_summary))
+
+DDBtable <- read.table("genomes/DDB-GeneID-UniProt.txt", sep = "\t", header = T)
+rownames(DDBtable) <- DDBtable$DDB.ID
+
+
+ddis_counts <- read.table("transcriptomics/counts_ddis.txt",sep = "\t", header = T)
+rownames(ddis_counts) <- ddis_counts$Geneid
+ddis_counts <- round(ddis_counts[,-c(1:6)])
+
+dfir_counts <- read.table("transcriptomics/counts_dfir.txt",sep = "\t", header = T)
+dfir_ID2name <- read.table("genomes/dfir_ID2name.txt",sep = "\t", header = F)
+sum(grepl("Similar to ",dfir_ID2name$V2))
+length(dplyr::intersect(dfir_counts$Geneid[rowSums(dfir_counts[,7:15])<100],dfir_ID2name$V1[dfir_ID2name$V3=="protein_coding"]))
+
+
+```
+
+```{r}
+sessionInfo()
+```
+
+
+

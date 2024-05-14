@@ -1,0 +1,1 @@
+gzcat Firmibasis_Guppy_6.3.8_pass_SUP_221019.fq.gz | awk '{if(NR%4==2) print length($1)}' | sort -n | uniq -c > read_length.txt

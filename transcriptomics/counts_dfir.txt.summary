@@ -1,0 +1,15 @@
+Status	star_map_dfir2/Dfir-0h-A_R1_001_cutadapt.fastq.gzAligned.sortedByCoord.out.bam	star_map_dfir2/Dfir-0h-B_R1_001_cutadapt.fastq.gzAligned.sortedByCoord.out.bam	star_map_dfir2/Dfir-0h-C_R1_001_cutadapt.fastq.gzAligned.sortedByCoord.out.bam	star_map_dfir2/Dfir-16h-A_R1_001_cutadapt.fastq.gzAligned.sortedByCoord.out.bam	star_map_dfir2/Dfir-16h-B_R1_001_cutadapt.fastq.gzAligned.sortedByCoord.out.bam	star_map_dfir2/Dfir-16h-C_R1_001_cutadapt.fastq.gzAligned.sortedByCoord.out.bam	star_map_dfir2/Dfir-24h-A_R1_001_cutadapt.fastq.gzAligned.sortedByCoord.out.bam	star_map_dfir2/Dfir-24h-B_R1_001_cutadapt.fastq.gzAligned.sortedByCoord.out.bam	star_map_dfir2/Dfir-24h-C_R1_001_cutadapt.fastq.gzAligned.sortedByCoord.out.bam
+Assigned	40633708	36659388	44889405	39273476	49275732	34518604	42319113	33351914	50363542
+Unassigned_Unmapped	0	0	0	0	0	0	0	0	0
+Unassigned_Read_Type	0	0	0	0	0	0	0	0	0
+Unassigned_Singleton	0	0	0	0	0	0	0	0	0
+Unassigned_MappingQuality	0	0	0	0	0	0	0	0	0
+Unassigned_Chimera	0	0	0	0	0	0	0	0	0
+Unassigned_FragmentLength	0	0	0	0	0	0	0	0	0
+Unassigned_Duplicate	0	0	0	0	0	0	0	0	0
+Unassigned_MultiMapping	0	0	0	0	0	0	0	0	0
+Unassigned_Secondary	0	0	0	0	0	0	0	0	0
+Unassigned_NonSplit	0	0	0	0	0	0	0	0	0
+Unassigned_NoFeatures	2891004	1110955	1990470	2547679	2011517	2734361	3033998	2435586	2244951
+Unassigned_Overlapping_Length	0	0	0	0	0	0	0	0	0
+Unassigned_Ambiguity	316081	284187	470778	242872	231607	194731	298933	205212	293587
