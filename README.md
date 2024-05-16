@@ -2,7 +2,10 @@
 Repository to accompany the analysis of the sequenced, assembled and annotated *Dictyostelium firmibasis* JAVFKY000000000 assembly (http://identifiers.org/ncbi/insdc:JAVFKY000000000). 
    
 ### Analysis and plots
-The main analysis and generation of the plots is in **firmibasis_analysis.Rmd**. All generated plots are also available in the plots folder. To enable the calculation of the gDNA and mRNA coverage over the genome, the mapped reads are counted over regular intervals and the counts are available in the <b>count_regions</b> folder. For example, the number of illumina short read gDNA sequences are counted in count_regions/regions_gDNA_illumina.txt. Other files needed for the analysis are located in the different folders.
+The main analysis and generation of the plots is in **firmibasis_analysis.Rmd**. All generated plots are also available in the plots folder. Other files needed for the analysis are located in the different folders.
+
+### Calculate coverage over genome
+To enable the calculation of the gDNA and mRNA coverage over the genome, the mapped reads are counted over regular intervals of the genome, generated with **count_regions/generate_regions.R**. The generated regions gff file and counts are available in the **count_regions** folder. For example, the number of illumina short read gDNA sequences are counted in count_regions/regions_gDNA_illumina.txt. 
 
 
 ### Genome metrics python script
