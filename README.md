@@ -5,7 +5,7 @@ Repository to accompany the analysis of the sequenced, assembled and annotated *
 The main analysis and generation of the plots is in **firmibasis_analysis.Rmd**. All generated plots are also available in the plots folder. Other files needed for the analysis are located in the different folders.
 
 ### Calculate coverage over genome
-To enable the calculation of the gDNA and mRNA coverage over the genome, the mapped reads are counted over regular intervals of the genome, generated with **count_regions/generate_regions.R**. The generated regions gff file and counts are available in the **count_regions** folder. For example, the number of illumina short read gDNA sequences are counted in count_regions/regions_gDNA_illumina.txt. 
+The gDNA and mRNA coverage over the genome was calculated using *samtools depth -aa* on the mapped .bam files. The average depth over the genome was calculated with **coverage/avg_depth.py**. To enable visualisation of the coverage over the genome, the mean coverage was calculated over 2.5 kbp regular intervals with the **coverage/cov_per_region.py** python script, resulting in the **coverage/regions_cov.txt** table. For the sRNA reads, the number of mapped reads was calculated with featureCounts over regular intervals.
 
 
 ### Genome metrics python script
