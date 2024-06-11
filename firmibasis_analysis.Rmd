@@ -2,6 +2,7 @@
 title: "Analysis of annotated <i>D. firmibasis</i> JAVFKY000000000 assembly"
 author: "Bart Edelbroek"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 editor_options:
@@ -66,27 +67,15 @@ discoideum <- data.frame(name = ddis_index[,1],
                          end = ddis_index[,2])
 discoideum$name <- factor(discoideum$name, levels = discoideum$name)
 
-dfir_regions <- read.table("count_regions/regions_mRNA_dfir.txt", sep = "\t", header = T)
-dfir_sum_regions <- cbind(dfir_regions[,2:4],mRNA = rowSums(dfir_regions[,-(1:6)]))
 dfir_gene_locations <- read.table("genomes/dfir_genes_location.txt", sep = " ")
 
 
-dfir_illumina_gDNA <- read.table("count_regions/regions_gDNA_illumina.txt", sep = "\t", header = T)
-dfir_nanopore_gDNA <- read.table("count_regions/regions_gDNA_nanopore.txt", sep = "\t", header = T)
 dfir_sRNA <- read.table("count_regions/regions_sRNA.txt", sep = "\t", header = T)
+dfir_sRNA <- dfir_sRNA[order(dfir_sRNA$Chr),]
 
-
-dfir_coverage <- cbind.data.frame(dfir_sum_regions[1:3], gDNA_onp = dfir_nanopore_gDNA[,7], gDNA_ill = dfir_illumina_gDNA[,7],  mRNA = dfir_sum_regions[,4], sRNA =   dfir_sRNA[,7] )
-dfir_coverage[,5:6] <- dfir_coverage[,5:6]*151/2500
-
-read_lengths <- read.table("count_regions/read_length.txt", sep = ",", header = F)
-read_lengths <- uncount(read_lengths, V1)
-dfir_coverage$gDNA_onp <- dfir_coverage$gDNA_onp*mean(read_lengths$V2)/2500
-dfir_coverage$sRNA <- dfir_coverage$sRNA
-
-ddis_regions <- read.table("count_regions/regions_mRNA_ddis.txt", sep = "\t", header = T)
-ddis_sum_regions <- cbind(ddis_regions[,2:4],mRNA = rowSums(ddis_regions[,-(1:6)]))
-combined_sum_regions <- rbind(dfir_sum_regions,ddis_sum_regions)
+dfir_mRNA_gDNA_cov <- read.table("coverage/regions_cov.txt", sep = "\t", header = T)
+dfir_mRNA_gDNA_cov <- dfir_mRNA_gDNA_cov[order(dfir_mRNA_gDNA_cov$Contig),]
+dfir_coverage <- cbind.data.frame(dfir_mRNA_gDNA_cov, sRNA =   dfir_sRNA[,7] )
 
 dfir_TE <- read.table("transposable_elements/out.txt", sep = "\t", header = F)
 dfir_TE <- dfir_TE[with(dfir_TE, order(V1,V4,V2)),]
@@ -130,7 +119,6 @@ dfir_dirs_TE_stitched <- cbind(dfir_dirs_TE_stitched[c(1,8,9)],1,dfir_dirs_TE_st
 reduced_dfir_coverage <- interpolate(dfir_coverage, interpol = 20)
 reduced_8_dfir_coverage <- interpolate(dfir_coverage, interpol = 8)
 
-dfir_coverage[,4:7] <- log10(1+dfir_coverage[,4:7])
 reduced_dfir_coverage[,4:7] <- log10(1+reduced_dfir_coverage[,4:7])
 
 
@@ -161,7 +149,7 @@ circos.genomicInitialize(firmibasis_main[,1:3],
 circos.track(ylim = c(0, 1), 
              bg.col = c(brewer.pal(7,"Dark2"),rep("white",7)), 
              track.height = 0.05)
-circos.genomicTrack(reduced_dfir_coverage[,-7], 
+circos.genomicTrack(reduced_dfir_coverage[,c(1:3,5,4,6)], 
 										ylim = c(0.5,4), 
 										panel.fun = function(region, value, ...) {
   circos.genomicLines(region, value, col = brewer.pal(4,"Set1")[-3], lwd = 1, ...)
@@ -201,10 +189,10 @@ pp$rightmargin <- 0.2
 kp <- plotKaryotype(genome = dirs_chr1, cytobands = dirs1_annot_chr1, labels.plotter = NULL, plot.params = pp)
 kpAddBaseNumbers(kp, tick.dist = 100000, tick.len = 10, tick.col="black", cex=0.8,
                  minor.tick.dist = 50000, minor.tick.len = 10, minor.tick.col = "black")
-kpLines(kp, toGRanges(data.frame(reduced_8_dfir_coverage[216:250,1:3], y=log10(reduced_8_dfir_coverage$mRNA[216:250]))), ymin = 1, ymax = 3,col="#984EA3")
-kpLines(kp, toGRanges(data.frame(reduced_8_dfir_coverage[216:250,1:3], y=log10(reduced_8_dfir_coverage$sRNA[216:250]*8))), ymin = 2, ymax = 4)
+kpLines(kp, toGRanges(data.frame(reduced_8_dfir_coverage[905:939,1:3], y=log10(reduced_8_dfir_coverage$mRNA[905:939]))), ymin = -1, ymax = 4,col="#984EA3")
+kpLines(kp, toGRanges(data.frame(reduced_8_dfir_coverage[905:939,1:3], y=log10(reduced_8_dfir_coverage$sRNA[905:939]*8))), ymin = 2, ymax = 4)
 #kpRect(kp, chr=dfir_gene_locations_dirs[,1], x0 = dfir_gene_locations_dirs[,2], x1 = dfir_gene_locations_dirs[,3], y0 = 0, y1 = 1, data.panel = "ideogram", border = NA, col = "grey")
-kpAxis(kp, side = 1, tick.pos = c(0,0.5,1), labels = c("10x","100x","1000x"), cex = 0.8, col = "#984EA3")
+kpAxis(kp, side = 1, tick.pos = c(0,0.2,0.4,0.6,0.8,1), labels = c("0.1x","1x","10x","100x","1000x","10000x"), cex = 0.8, col = "#984EA3")
 kpAxis(kp, side = 2, numticks = 3, tick.pos = c(0,0.5,1), labels = c(100,1000,10000), cex = 0.8, col = "black")
 #dev.off()
 
@@ -213,7 +201,7 @@ kpAxis(kp, side = 2, numticks = 3, tick.pos = c(0,0.5,1), labels = c(100,1000,10
 
 # Mean coverage of different data types
 ```{r}
-round(colMeans(10^dfir_coverage[,4:7]-1))
+round(colMeans(dfir_coverage[,4:7]))
 ```
 
 # Synteny analysis of new and old D. firimbasis assembly
